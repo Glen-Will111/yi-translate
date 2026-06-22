@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_API = "/api/translate";
 
 const SYSTEM_PROMPT = `You are a professional bilingual interpreter with native-level fluency in both English and Mandarin Chinese. Your role is to provide accurate, natural-sounding translations that preserve the speaker's intent, tone, and nuance.
 
