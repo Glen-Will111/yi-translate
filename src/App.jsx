@@ -64,6 +64,7 @@ export default function App() {
   const [showInput, setShowInput] = useState(false);
 
   const recognitionRef = useRef(null);
+  const lastStopRef = useRef(0);
   const latestTranscriptRef = useRef("");
   const activeSideRef = useRef(null);
   const bottomRef = useRef(null);
@@ -117,8 +118,11 @@ export default function App() {
     setIsTranslating(true);
     setStatus("Translating…");
     try {
+      const direction = sourceLang === "en"
+        ? "Translate this English into Mandarin Chinese."
+        : "Translate this Mandarin Chinese into English.";
       const translation = await callClaude([
-        { role: "user", content: `Script variant: ${script}\n\n${text}` }
+        { role: "user", content: `Script variant: ${script}\n${direction}\n\n${text}` }
       ], SYSTEM_PROMPT);
 
       const id = Date.now();
@@ -143,6 +147,7 @@ export default function App() {
   const stopListening = useCallback((translateOnStop = false) => {
     const transcript = latestTranscriptRef.current.trim();
     const side = activeSideRef.current;
+    if (recognitionRef.current) lastStopRef.current = Date.now();
     try { recognitionRef.current?.abort(); } catch { /* ignore */ }
     recognitionRef.current = null;
     latestTranscriptRef.current = "";
@@ -165,6 +170,8 @@ export default function App() {
       stopListening(true); // true = translate whatever we captured
       return;
     }
+    const wasBusy = recognitionRef.current !== null
+      || Date.now() - lastStopRef.current < 800;
     stopListening(false);
     synthRef.current?.cancel();
 
@@ -178,12 +185,18 @@ export default function App() {
     rec.interimResults = true;
     rec.maxAlternatives = 1;
 
+    // Ignore late events from an older mic session (iOS sends "end"/"aborted"
+    // after a new mic has already started, which used to switch the new one off)
+    const isCurrent = () => recognitionRef.current === rec;
+
     rec.onstart = () => {
+      if (!isCurrent()) return;
       setIsListening(true);
       setActiveSide(side);
       setStatus(side === "en" ? "Listening… tap mic to stop" : "聆听中… 点击停止");
     };
     rec.onresult = (e) => {
+      if (!isCurrent()) return;
       const interim = Array.from(e.results).map(r => r[0].transcript).join("");
       setLiveText(interim);
       latestTranscriptRef.current = interim; // always store latest for iOS
@@ -196,12 +209,16 @@ export default function App() {
       }
     };
     rec.onerror = (e) => {
+      if (!isCurrent()) return;
       if (e.error !== "aborted" && e.error !== "no-speech") {
         setStatus(`Mic error: ${e.error}`);
       }
       stopListening(false);
     };
     rec.onend = () => {
+      if (!isCurrent()) return;
+      recognitionRef.current = null;
+      lastStopRef.current = Date.now();
       // iOS often ends without firing isFinal — catch it here
       const transcript = latestTranscriptRef.current.trim();
       const currentSide = activeSideRef.current;
@@ -217,7 +234,19 @@ export default function App() {
         setActiveSide(null);
       }
     };
-    rec.start();
+
+    const begin = () => {
+      if (!isCurrent()) return;
+      try {
+        rec.start();
+      } catch {
+        setStatus("Mic busy — tap again");
+        recognitionRef.current = null;
+        activeSideRef.current = null;
+      }
+    };
+    // iPhones need a moment to release the mic before the other language can use it
+    if (wasBusy) setTimeout(begin, 350); else begin();
   }, [isListening, activeSide, script, stopListening, translate]);
 
   const handleTypedSubmit = useCallback((side) => {
