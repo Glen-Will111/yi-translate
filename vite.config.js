@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: '译 · Translate',
         short_name: '译 Translate',
-        description: 'English ↔ Mandarin real-time translation powered by Claude AI',
+        description: 'English ↔ Chongqing dialect / Mandarin conversation interpreter powered by Claude AI',
         theme_color: '#161b22',
         background_color: '#0d1117',
         display: 'standalone',
