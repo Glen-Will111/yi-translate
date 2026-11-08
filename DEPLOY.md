@@ -1,5 +1,5 @@
 # 译 · Translate — Deployment Guide
-## English ↔ Mandarin PWA · Powered by Claude AI
+## English ↔ Chongqing dialect / Mandarin conversation interpreter · Powered by Claude AI
 
 ---
 
@@ -77,30 +77,83 @@ For Mandarin recognition to work well:
 
 ---
 
+## STEP 6 — Keys and (optional) passcode in Netlify
+
+Netlify → your site → **Site configuration → Environment variables**:
+
+| Variable | Needed? | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | **Required** | Your Claude API key. Stays on Netlify, never on the phone. |
+| `APP_PASSCODE` | Recommended | Any word or number. Without it, anyone who finds the site address can use your key. Once set, enter the same passcode once in the app under ⚙ → Passcode. |
+
+After changing variables: **Deploys → Trigger deploy → Deploy site**.
+
+---
+
+## STEP 7 — Best iPhone settings for this app
+
+- **Better voices:** Settings → Accessibility → Spoken Content → Voices →
+  download an *Enhanced* or *Premium* voice for **Chinese (China mainland)**
+  (e.g. Lili or Yu-shu) and **English (Australia)** (e.g. Karen or Lee).
+  The app picks Enhanced/Premium voices automatically.
+- **Recognition:** Settings → General → Keyboard → add **Chinese, Simplified**
+  and make sure **Enable Dictation** is on.
+- **Volume:** the side button volume controls the spoken translation. Use the
+  loudspeaker, not headphones, so you both hear it.
+
+---
+
 ## USING THE APP
 
-**Mic buttons** (bottom of screen)
-- Tap the **English** mic → speak → tap again to stop (or it auto-stops)
-- Tap the **普通话** mic → speak in Mandarin → tap again to stop
-- Translation appears on screen and is spoken aloud automatically
+### Conversation mode (hands-free)
+1. Put the phone between you and Lucy and tap **▶ Start**.
+2. It listens to **Glen** first (blue). Speak normally, then pause.
+3. It translates, **checks the translation**, then speaks it in Mandarin.
+4. The mic then passes to **Lucy** (red). She can speak 重庆话 or 普通话.
+5. Her words are translated, checked and spoken in English, and the mic
+   comes back to you. It keeps taking turns until you tap **■ Stop**.
 
-**⌨ Keyboard button** (centre, between mic buttons)
-- Opens typed input for both languages when voice isn't practical
+- **Wrong person?** Tap the other name at any time to switch who is listened to.
+- **Finished talking?** Tap your own name while it's listening to send straight away.
+- **Mic paused while the phone speaks**, so it never translates itself.
+- **Screen stays awake** during a conversation. If the phone locks, it picks up
+  again when you unlock it.
+- If the phone hears nonsense (usually the other person talking on the wrong
+  turn), it says "please say that again" to the other person and passes them the mic.
 
-**⚙ Settings** (top right)
-- Script: Simplified (简) or Traditional (繁)
-- Font size: S / M / L / XL
-- Pinyin: ON shows tone-marked pinyin below each Chinese exchange
-- Auto-speak: ON/OFF for text-to-speech
-- Clear conversation
+### Tap-to-talk (one line at a time)
+With Conversation mode stopped, tap **Glen** or **Lucy** to translate a single line.
 
-**↑ Export** (top right)
-- Text (.txt), HTML (.html), CSV (.csv), or Copy to clipboard
-- All exports include pinyin and any flagged exchanges
+### What's on each card
+- **What was said**, plus *Phone heard:* when the app fixed a recognition mistake
+  (e.g. 傻子 → 啥子, common with Chongqing accents)
+- **Translation**, with pinyin for the Chinese side
+- **✓ checked**: passed the back-translation check before being spoken
+- **✓ checked · corrected**: a problem was found and fixed before speaking
+- **⚠ check this**: still uncertain after 3 rounds; spoken, but flagged
+- **📝 Notes**: dialect words and slang explained (e.g. 巴适, 好多, "arvo")
+- **❓ To confirm**: a genuine ambiguity (e.g. 四 vs 十). Tap **🗣 Ask Lucy** to
+  play a short question in Mandarin asking her to confirm.
+- **How it was checked**: tap to see the back-translation used for the check
 
-**⚠ Orange border on an exchange**
-- Silent back-translation detected a possible accuracy issue
-- Tap 🔊 Replay to hear both sides and verify
+### ⌨ Type
+Type a line for either person when speaking isn't practical.
+
+### ↑ Save (the record)
+The whole conversation is kept on the phone automatically, even if the app is closed.
+Save or share it as a **Page** (prints nicely), **Text**, **Spreadsheet** (opens in
+Excel/Numbers with Chinese intact) or **Copy**. On iPhone this opens the Share sheet:
+Save to Files, Mail, Messages, AirDrop.
+
+### ⚙ Settings
+- **Names**: the two people's names (used on screen, in prompts and in the record)
+- **About you both**: a sentence about your relationship and how you talk. This sets
+  the tone and wording (e.g. 你 vs 您, how casual to be)
+- **Check first**: *Before speaking* (most accurate, about 2–4 s slower) or *After*
+  (speaks immediately; flags problems afterwards)
+- **Turns**: *Auto-switch* between you, or stay on the *Same person*
+- **Voice speed**, **Script** (简/繁), **Pinyin**, **Text size**, **Passcode**
+- **Clear conversation** (asks first, so export before clearing)
 
 ---
 
