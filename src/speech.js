@@ -97,6 +97,7 @@ export class Listener {
 // ── Speaking ────────────────────────────────────────────────────────────
 
 let speechToken = 0;
+let current = null; // { token, complete(cancelled) }
 
 function pickVoice(lang) {
   const synth = window.speechSynthesis;
@@ -122,21 +123,27 @@ export function unlockSpeech() {
   } catch { /* ignore */ }
 }
 
+/** Stop speaking now. Whoever is waiting on the speech is told it was cancelled. */
 export function stopSpeaking() {
   speechToken++;
+  const c = current;
+  current = null;
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  c?.complete(true);
 }
 
 /**
- * Speak text and call onEnd once it has really finished. iOS sometimes never
- * fires "end", so a generous timer backs it up, and the mic is only handed back
- * once the synthesiser reports it is silent (otherwise the phone would hear
- * and translate its own voice).
+ * Speak text. onEnd({ cancelled }) is always called exactly once: when the
+ * speech has really finished, or straight away if it is cancelled or replaced.
+ * iOS sometimes never fires "end", so a generous timer backs it up, and the
+ * finish is only reported once the synthesiser is silent (otherwise the phone
+ * would hear and translate its own voice).
  */
 export function speak(text, lang, { rate = 0.92, onEnd } = {}) {
   const synth = window.speechSynthesis;
+  if (current) { const c = current; current = null; c.complete(true); }
   const token = ++speechToken;
-  if (!synth || !text) { onEnd?.(); return; }
+  if (!synth || !text) { onEnd?.({ cancelled: false }); return; }
   try { synth.cancel(); } catch { /* ignore */ }
 
   const utt = new SpeechSynthesisUtterance(text);
@@ -146,22 +153,30 @@ export function speak(text, lang, { rate = 0.92, onEnd } = {}) {
   if (voice) utt.voice = voice;
 
   let done = false;
-  const finish = () => {
+  let timer = null;
+  const complete = (cancelled) => {
     if (done) return;
     done = true;
     clearTimeout(timer);
-    if (token !== speechToken) return; // cancelled or replaced
+    if (current?.token === token) current = null;
+    onEnd?.({ cancelled });
+  };
+  const finished = () => {
+    if (done) return;
+    clearTimeout(timer);
     let waited = 0;
     const waitForSilence = () => {
-      if (token !== speechToken) return;
+      if (done) return;
+      if (token !== speechToken) { complete(true); return; }
       if (synth.speaking && waited < 10000) { waited += 250; setTimeout(waitForSilence, 250); return; }
-      setTimeout(() => { if (token === speechToken) onEnd?.(); }, 300);
+      setTimeout(() => complete(token !== speechToken), 300);
     };
     waitForSilence();
   };
+  current = { token, complete };
   const perChar = lang.startsWith("zh") ? 320 : 95;
-  const timer = setTimeout(finish, 3000 + (text.length * perChar) / rate);
-  utt.onend = finish;
-  utt.onerror = finish;
+  timer = setTimeout(finished, 3000 + (text.length * perChar) / rate);
+  utt.onend = finished;
+  utt.onerror = finished;
   synth.speak(utt);
 }

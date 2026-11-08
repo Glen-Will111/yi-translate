@@ -79,7 +79,7 @@ TRANSCRIPT: ${text}`;
   if (!j || !str(j.translation)) {
     // A bare translation with no JSON is still usable; anything else is an error.
     if (raw && !raw.includes("{")) {
-      return { garbled: false, heardAs: text, translation: raw, tone: null, notes: [], check: null, ask: null };
+      return { garbled: false, heardAs: text, translation: raw, tone: null, notes: [], notesZh: [], check: null, checkZh: null, ask: null };
     }
     throw new Error("Couldn't read the translation. Tap Retry.");
   }
@@ -89,7 +89,9 @@ TRANSCRIPT: ${text}`;
     translation: str(j.translation),
     tone: str(j.tone),
     notes: Array.isArray(j.notes) ? j.notes.map(str).filter(Boolean) : [],
+    notesZh: Array.isArray(j.notes_zh) ? j.notes_zh.map(str).filter(Boolean) : [],
     check: str(j.check),
+    checkZh: str(j.check_zh),
     ask: side === "zh" ? str(j.ask) : null,
   };
 }
@@ -142,4 +144,71 @@ export async function verifyTranslation({ source, translation, side, settings })
 
 export async function fetchPinyin(chinese, settings) {
   return callClaude({ system: PINYIN_PROMPT, user: chinese, maxTokens: 800, passcode: settings.passcode });
+}
+
+// ── OpenAI hearing ────────────────────────────────────────────────────────
+
+const TRANSCRIBE_ENDPOINT = "/api/transcribe";
+
+/** Is OpenAI hearing set up on the server (OPENAI_API_KEY present)? */
+export async function cloudHearingAvailable() {
+  try {
+    const res = await fetch(TRANSCRIBE_ENDPOINT, { method: "GET" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.enabled === true;
+  } catch { return false; }
+}
+
+export function transcriptionPrompt(names) {
+  return `${names.en} and ${names.zh}, a couple, chatting at home. ${names.en} speaks Australian English. ${names.zh} is from Chongqing and speaks Mandarin, sometimes with Chongqing dialect words. 中文请用简体字。`;
+}
+
+export async function transcribeAudio(blob, settings) {
+  const form = new FormData();
+  form.append("file", blob, "speech.wav");
+  form.append("prompt", transcriptionPrompt(settings.names));
+  const headers = {};
+  if (settings.passcode) headers["x-app-passcode"] = settings.passcode;
+  let res;
+  try {
+    res = await fetch(TRANSCRIBE_ENDPOINT, { method: "POST", headers, body: form });
+  } catch {
+    throw new Error("No connection. Check Wi-Fi or mobile data.");
+  }
+  if (res.status === 401) throw new Error("Passcode needed or wrong. Check ⚙ Settings.");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Hearing service error (${res.status})${data.error ? `: ${data.error}` : ""}`);
+  return (data.text || "").trim();
+}
+
+const HAN = /[\u3400-\u9fff\uf900-\ufaff]/g;
+const LATIN_WORD = /[A-Za-z]+(?:'[A-Za-z]+)?/g;
+
+/** Who spoke, judged by the language of the words: Chinese → zh side, otherwise en. */
+export function detectSide(text) {
+  const han = (text.match(HAN) || []).length;
+  const latin = (text.match(LATIN_WORD) || []).length;
+  if (!han) return "en";
+  if (!latin) return "zh";
+  return han >= latin * 1.5 ? "zh" : "en";
+}
+
+// Phrases speech models are known to invent from silence or background noise.
+const PHANTOMS = [
+  /^(thank you|thanks) (so much )?for watching[.!]*$/i,
+  /subtitles? (by|from|created)/i,
+  /amara\.org/i,
+  /字幕/,
+  /(点赞|订阅).*(订阅|转发|打赏)/,
+  /^(谢谢|感谢)(大家)?(观看|收看)[。！!]*$/,
+];
+
+/** Drop empty results, invented "phantom" phrases and echoes of the prompt. */
+export function isPhantom(text, names) {
+  const t = (text || "").trim();
+  if (!t || !/[\p{L}\p{N}]/u.test(t)) return true;
+  if (PHANTOMS.some(re => re.test(t))) return true;
+  const prompt = transcriptionPrompt(names);
+  return t.length > 12 && prompt.includes(t);
 }

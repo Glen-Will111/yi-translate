@@ -83,10 +83,20 @@ Netlify → your site → **Site configuration → Environment variables**:
 
 | Variable | Needed? | What it does |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | **Required** | Your Claude API key. Stays on Netlify, never on the phone. |
-| `APP_PASSCODE` | Recommended | Any word or number. Without it, anyone who finds the site address can use your key. Once set, enter the same passcode once in the app under ⚙ → Passcode. |
+| `ANTHROPIC_API_KEY` | **Required** | Your Claude API key (translation and checking). Stays on Netlify, never on the phone. |
+| `OPENAI_API_KEY` | Recommended | Your OpenAI API key, for **OpenAI hearing** (see below). Without it the app uses the iPhone's own hearing and takes turns. |
+| `APP_PASSCODE` | Recommended | Any word or number. Without it, anyone who finds the site address can use your keys. Once set, enter the same passcode once in the app under ⚙ → Passcode. |
+| `OPENAI_TRANSCRIBE_MODEL` | Optional | Leave unset to use `gpt-4o-transcribe`. Only change it if OpenAI renames or replaces that model. |
 
 After changing variables: **Deploys → Trigger deploy → Deploy site**.
+
+### Getting an OpenAI key
+1. Go to https://platform.openai.com and sign in (or create an account).
+2. **Settings → Billing**: add a payment method and a small credit (e.g. US$5–10).
+   Hearing costs roughly a cent per minute of actual talking. Silence is never sent.
+3. **API keys → Create new secret key**. Name it `yi-translate` and copy it.
+4. Paste it into Netlify as `OPENAI_API_KEY` (above) and redeploy.
+5. In the app, ⚙ Settings → **Hearing** should now say **OpenAI ready ✓**.
 
 ---
 
@@ -107,19 +117,26 @@ After changing variables: **Deploys → Trigger deploy → Deploy site**.
 
 ### Conversation mode (hands-free)
 1. Put the phone between you and Lucy and tap **▶ Start**.
-2. It listens to **Glen** first (blue). Speak normally, then pause.
-3. It translates, **checks the translation**, then speaks it in Mandarin.
-4. The mic then passes to **Lucy** (red). She can speak 重庆话 or 普通话.
-5. Her words are translated, checked and spoken in English, and the mic
-   comes back to you. It keeps taking turns until you tap **■ Stop**.
+2. **Just talk to each other.** With OpenAI hearing it listens to you both all the
+   time and works out who is speaking from the language: English = Glen,
+   Chinese = Lucy. No turn-taking needed.
+3. When someone pauses, it translates, **checks the translation**, then speaks it.
+   Whatever is said while it's translating is queued and handled in order.
+4. Tap **■ Stop** when you've finished.
 
-- **Wrong person?** Tap the other name at any time to switch who is listened to.
-- **Finished talking?** Tap your own name while it's listening to send straight away.
-- **Mic paused while the phone speaks**, so it never translates itself.
-- **Screen stays awake** during a conversation. If the phone locks, it picks up
-  again when you unlock it.
-- If the phone hears nonsense (usually the other person talking on the wrong
-  turn), it says "please say that again" to the other person and passes them the mic.
+- **Finished talking but it hasn't noticed?** Tap your name to send straight away.
+- **The green line under the status** shows the mic level, so you can see it hearing you.
+- **Mic deaf while the phone speaks**, so it never translates itself.
+- **Screen stays awake** during a conversation.
+- **Got the wrong person?** Open "How it was checked" on the card → **⇄ Wrong person?**
+- **Background noise or a TV** that gets picked up is shown greyed as "Ignored".
+- **Settings that help:** *Mic pickup* (Noisy room / Normal / Quiet voices) and
+  *Wait for pause* (Long is good when you're both speaking slowly while learning).
+
+**If anything misbehaves on the day** (e.g. the spoken voice is too quiet while the
+mic is open, or the mic won't start), go to ⚙ → Hearing → **iPhone**. That uses the
+iPhone's own hearing, which takes turns: it listens to Glen (blue), then Lucy (red),
+and you tap a name to switch who it's listening to.
 
 ### Tap-to-talk (one line at a time)
 With Conversation mode stopped, tap **Glen** or **Lucy** to translate a single line.
@@ -136,22 +153,30 @@ With Conversation mode stopped, tap **Glen** or **Lucy** to translate a single l
   play a short question in Mandarin asking her to confirm.
 - **How it was checked**: tap to see the back-translation used for the check
 
+### Learning each other's language
+- **🔊 Replay** and **🐢 Slow** under every line, in both languages
+- **Pinyin** under every Chinese line
+- **📝 Notes** explain slang, dialect and useful phrases, in English *and* Chinese
+
 ### ⌨ Type
 Type a line for either person when speaking isn't practical.
 
 ### ↑ Save (the record)
 The whole conversation is kept on the phone automatically, even if the app is closed.
-Save or share it as a **Page** (prints nicely), **Text**, **Spreadsheet** (opens in
-Excel/Numbers with Chinese intact) or **Copy**. On iPhone this opens the Share sheet:
-Save to Files, Mail, Messages, AirDrop.
+Choose **Copy for: Glen** (English headings and notes) or **Lucy** (中文标题和注释).
+Both copies show English and Chinese side by side with pinyin, so you can compare
+and study from them. Save or share as a **Page** (prints nicely), **Text**,
+**Spreadsheet** (opens in Excel/Numbers with Chinese intact) or **Copy**. On iPhone
+this opens the Share sheet: Messages, WeChat, Mail, Files, AirDrop.
 
 ### ⚙ Settings
 - **Names**: the two people's names (used on screen, in prompts and in the record)
-- **About you both**: a sentence about your relationship and how you talk. This sets
-  the tone and wording (e.g. 你 vs 您, how casual to be)
+- **About you both**: set to *"We are a couple. We talk to each other in a relaxed,
+  affectionate, informal way."* Edit it any time (e.g. add Lucy's district)
+- **Hearing**: *OpenAI* (hands-free, recommended) or *iPhone* (taking turns)
 - **Check first**: *Before speaking* (most accurate, about 2–4 s slower) or *After*
   (speaks immediately; flags problems afterwards)
-- **Turns**: *Auto-switch* between you, or stay on the *Same person*
+- **Mic pickup** / **Wait for pause** (OpenAI hearing) or **Turns** (iPhone hearing)
 - **Voice speed**, **Script** (简/繁), **Pinyin**, **Text size**, **Passcode**
 - **Clear conversation** (asks first, so export before clearing)
 
