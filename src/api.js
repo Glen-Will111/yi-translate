@@ -79,13 +79,14 @@ TRANSCRIPT: ${text}`;
   if (!j || !str(j.translation)) {
     // A bare translation with no JSON is still usable; anything else is an error.
     if (raw && !raw.includes("{")) {
-      return { garbled: false, heardAs: text, translation: raw, tone: null, notes: [], notesZh: [], check: null, checkZh: null, ask: null };
+      return { garbled: false, heardAs: text, mandarin: null, translation: raw, tone: null, notes: [], notesZh: [], check: null, checkZh: null, ask: null };
     }
     throw new Error("Couldn't read the translation. Tap Retry.");
   }
   return {
     garbled: j.garbled === true,
     heardAs: str(j.heard_as) || text,
+    mandarin: side === "zh" ? str(j.mandarin) : null,
     translation: str(j.translation),
     tone: str(j.tone),
     notes: Array.isArray(j.notes) ? j.notes.map(str).filter(Boolean) : [],

@@ -335,7 +335,8 @@ export default function App() {
       }
 
       updateEntry(id, {
-        source: r.heardAs, translated: r.translation, tone: r.tone,
+        source: r.heardAs, mandarin: side === "zh" ? (r.mandarin || r.heardAs) : null,
+        translated: r.translation, tone: r.tone,
         notes: r.notes, notesZh: r.notesZh, check: r.check, checkZh: r.checkZh, ask: r.ask,
         status: s.verifyFirst ? "checking" : "done",
         verify: s.verifyFirst ? "pending" : "background",
@@ -355,7 +356,8 @@ export default function App() {
           .catch(() => updateEntry(id, { verify: "unchecked" }));
       }
 
-      const chinese = side === "zh" ? r.heardAs : finalText;
+      // Pinyin always for standard Mandarin, the version Glen learns from.
+      const chinese = side === "zh" ? (r.mandarin || r.heardAs) : finalText;
       fetchPinyin(chinese, s).then(p => p && updateEntry(id, { pinyin: p })).catch(() => { /* optional */ });
 
       if (maySpeak()) await speakAsync(finalText, other(side));
@@ -920,6 +922,8 @@ function EntryCard({ entry, names, fs, settings, canAct, canRetryAudio, onReplay
 
   const badge = VERIFY_BADGE[entry.verify];
   const pinyin = settings.showPinyin && entry.pinyin;
+  const shownSource = (side === "zh" && entry.mandarin) || entry.source;
+  const dialectDiffers = side === "zh" && entry.mandarin && entry.mandarin !== entry.source;
   const done = entry.status === "done";
 
   return (
@@ -927,12 +931,18 @@ function EntryCard({ entry, names, fs, settings, canAct, canRetryAudio, onReplay
       {/* What was said */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid #21262d" }}>
         {header}
-        <div style={{ fontSize: side === "zh" ? fs + 2 : fs, lineHeight: 1.6, fontFamily: ownFont }}>{entry.source}</div>
+        {/* Lucy's lines are shown in standard Mandarin; her own (dialect) words underneath if different */}
+        <div style={{ fontSize: side === "zh" ? fs + 2 : fs, lineHeight: 1.6, fontFamily: ownFont }}>{shownSource}</div>
         {pinyin && side === "zh" && <div style={pinyinStyle(fs)}>{entry.pinyin}</div>}
+        {dialectDiffers && (
+          <div style={{ fontSize: 12, color: "#8b949e", marginTop: 4, fontFamily: CN_FONT }}>
+            {names.zh}'s own words (重庆话): {entry.source}
+          </div>
+        )}
         {entry.heard && entry.heard !== entry.source && (
           <div style={{ fontSize: 11, color: "#6e7681", marginTop: 3, fontFamily: ownFont }}>Phone heard: {entry.heard}</div>
         )}
-        {done && replayRow(entry.source, side)}
+        {done && replayRow(shownSource, side)}
       </div>
 
       {/* Translation */}

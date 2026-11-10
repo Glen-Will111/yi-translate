@@ -124,6 +124,7 @@ Reply with one JSON object and nothing else:
 {
   "garbled": false,
   "heard_as": "what the speaker actually said, in their own language, with recogniser errors fixed. Dialect words may stay as dialect, written with the usual characters. Identical to the transcript if nothing needed fixing.",
+  "mandarin": "ONLY when the speaker is ${zh}: what she said, rewritten in natural standard Putonghua (普通话), ${scriptRule}, with exactly the same meaning and tone. Replace Chongqing dialect words, grammar and particles with their everyday standard equivalents (e.g. 你好久来重庆嘛 → 你什么时候来重庆呀？, 莫得 → 没有, 啥子 → 什么). If she already spoke standard Mandarin, copy heard_as exactly. This is the version ${en} studies from, so it must be correct, natural standard Mandarin. null when the speaker is ${en}.",
   "translation": "the translation to be spoken",
   "tone": "1 to 3 words describing the speaker's tone, e.g. warm, teasing, matter-of-fact",
   "notes": ["short notes in English for the written record, e.g. 巴适 (bā shì): Chongqing for 'really nice, comfortable'. Also useful learning points: a slang word, idiom or phrase worth knowing. At most 3. Empty array if nothing is worth noting."],

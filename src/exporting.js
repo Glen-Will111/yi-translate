@@ -8,6 +8,8 @@ const L = {
     count: k => `${k} exchanges`,
     exported: "exported",
     said: "said", translated: "translation", heard: "Phone heard",
+    saidStd: "said · standard Mandarin",
+    alt: n => `${n.zh}'s own words (Chongqing dialect)`,
     pinyin: "Pinyin", note: "Note", confirm: "To confirm", accuracy: "Accuracy",
     english: "English", chinese: "中文",
     verify: { pass: "Checked", fixed: "Checked (corrected)", fail: "CHECK: may be inaccurate", unchecked: "Not checked" },
@@ -18,6 +20,8 @@ const L = {
     count: k => `共 ${k} 条`,
     exported: "导出于",
     said: "原话", translated: "翻译", heard: "手机听到",
+    saidStd: "原话",
+    alt: () => "普通话",
     pinyin: "拼音", note: "注释", confirm: "需确认", accuracy: "准确性",
     english: "English", chinese: "中文",
     verify: { pass: "已核对", fixed: "已核对（已修正）", fail: "请核对：可能不准确", unchecked: "未核对" },
@@ -43,11 +47,17 @@ const escapeHtml = s => String(s ?? "")
 
 const csvCell = s => `"${String(s ?? "").replace(/"/g, '""')}"`;
 
-/** The English text, Chinese text and which one was originally said. */
-function sides(e) {
-  return e.speaker === "en"
-    ? { english: e.source, chinese: e.translated, originalIs: "en" }
-    : { english: e.translated, chinese: e.source, originalIs: "zh" };
+/**
+ * The English text, Chinese text and which one was originally said.
+ * Glen's copy shows Lucy's lines in standard Mandarin (understood all over
+ * China), with her own Chongqing words as an extra line. Lucy's copy shows her
+ * own words, with the standard Mandarin as the extra line.
+ */
+function sides(e, lang) {
+  if (e.speaker === "en") return { english: e.source, chinese: e.translated, originalIs: "en", alt: null, std: false };
+  const differs = e.mandarin && e.mandarin !== e.source;
+  if (lang === "zh") return { english: e.translated, chinese: e.source, originalIs: "zh", alt: differs ? e.mandarin : null, std: false };
+  return { english: e.translated, chinese: e.mandarin || e.source, originalIs: "zh", alt: differs ? e.source : null, std: !!differs };
 }
 const notesFor = (e, lang) => (lang === "zh" && e.notesZh?.length ? e.notesZh : e.notes) || [];
 const checkFor = (e, lang) => (lang === "zh" ? (e.checkZh || e.check) : e.check);
@@ -62,12 +72,14 @@ export function toText(entries, names, lang = "en") {
   const t = L[lang];
   const rows = usable(entries);
   const body = rows.map(e => {
-    const s = sides(e);
-    const tag = which => (s.originalIs === which ? t.said : t.translated);
+    const s = sides(e, lang);
+    const tag = which => (s.originalIs === which ? (which === "zh" && s.std ? t.saidStd : t.said) : t.translated);
     const lines = [`[${fmtTime(e.time)}] ${names[e.speaker]}${lang === "en" && e.tone ? ` (${e.tone})` : ""}`];
     lines.push(`  ${t.english} (${tag("en")}): ${s.english}`);
     lines.push(`  ${t.chinese} (${tag("zh")}): ${s.chinese}`);
-    if (e.pinyin) lines.push(`  ${t.pinyin}: ${e.pinyin}`);
+    if (e.pinyin && !(lang === "zh" && s.alt)) lines.push(`  ${t.pinyin}: ${e.pinyin}`);
+    if (s.alt) lines.push(`  ${t.alt(names)}: ${s.alt}`);
+    if (e.pinyin && lang === "zh" && s.alt) lines.push(`  ${t.pinyin}: ${e.pinyin}`);
     if (e.heard && e.heard !== e.source) lines.push(`  ${t.heard}: ${e.heard}`);
     notesFor(e, lang).forEach(n => lines.push(`  ${t.note}: ${n}`));
     if (checkFor(e, lang)) lines.push(`  ${t.confirm}: ${checkFor(e, lang)}`);
@@ -79,12 +91,12 @@ export function toText(entries, names, lang = "en") {
 
 export function toCsv(entries, names, lang = "en") {
   const header = lang === "zh"
-    ? ["日期", "时间", "说话人", "English", "中文", "拼音", "原话语言", "手机听到", "注释", "需确认", "准确性"]
-    : ["Date", "Time", "Speaker", "English", "Chinese", "Pinyin", "Originally said in", "Phone heard", "Notes", "To confirm", "Accuracy"];
+    ? ["日期", "时间", "说话人", "English", "中文", "普通话", "拼音（普通话）", "原话语言", "手机听到", "注释", "需确认", "准确性"]
+    : ["Date", "Time", "Speaker", "English", "Chinese (standard Mandarin)", `${names.zh}'s own words (Chongqing dialect)`, "Pinyin", "Originally said in", "Phone heard", "Notes", "To confirm", "Accuracy"];
   const rows = usable(entries).map(e => {
-    const s = sides(e);
+    const s = sides(e, lang);
     return [
-      fmtDate(e.time, lang), fmtTime(e.time), names[e.speaker], s.english, s.chinese, e.pinyin,
+      fmtDate(e.time, lang), fmtTime(e.time), names[e.speaker], s.english, s.chinese, s.alt, e.pinyin,
       s.originalIs === "en" ? "English" : "中文", e.heard !== e.source ? e.heard : "",
       notesFor(e, lang).join(" | "), checkFor(e, lang), verifyFor(e, lang),
     ].map(csvCell).join(",");
@@ -97,16 +109,18 @@ export function toHtml(entries, names, lang = "en") {
   const t = L[lang];
   const rows = usable(entries);
   const cards = rows.map(e => {
-    const s = sides(e);
+    const s = sides(e, lang);
     const flag = e.verify === "fail";
-    const label = which => `<span class="tag">${s.originalIs === which ? t.said : t.translated}</span>`;
+    const label = which => `<span class="tag">${s.originalIs === which ? (which === "zh" && s.std ? t.saidStd : t.said) : t.translated}</span>`;
+    const py = e.pinyin ? `<div class="py">${escapeHtml(e.pinyin)}</div>` : "";
+    const alt = s.alt ? `<div class="alt"><span class="lbl">${escapeHtml(t.alt(names))}:</span> <span class="cn2">${escapeHtml(s.alt)}</span></div>` : "";
     return `<div class="card ${e.speaker}${flag ? " flag" : ""}">
   <div class="meta"><b>${escapeHtml(names[e.speaker])}</b>${lang === "en" && e.tone ? ` · ${escapeHtml(e.tone)}` : ""} · ${fmtTime(e.time)}
     <span class="v">${escapeHtml(verifyFor(e, lang))}</span></div>
   <div class="pair">
     <div class="col"><div class="lbl">${t.english} ${label("en")}</div><div class="txt">${escapeHtml(s.english)}</div></div>
     <div class="col"><div class="lbl">${t.chinese} ${label("zh")}</div><div class="txt cn">${escapeHtml(s.chinese)}</div>
-      ${e.pinyin ? `<div class="py">${escapeHtml(e.pinyin)}</div>` : ""}</div>
+      ${lang === "zh" && s.alt ? alt + py : py + alt}</div>
   </div>
   ${e.heard && e.heard !== e.source ? `<div class="small">${t.heard}: ${escapeHtml(e.heard)}</div>` : ""}
   ${notesFor(e, lang).map(n => `<div class="small">📝 ${escapeHtml(n)}</div>`).join("")}
@@ -129,6 +143,7 @@ h1{font-size:20px;margin-bottom:4px}.sub{color:#656d76;font-size:13px;margin-bot
 .txt{font-size:16px;line-height:1.5}.cn{font-family:"PingFang SC","Noto Sans SC",sans-serif;font-size:18px}
 .py{font-size:13px;color:#656d76;font-style:italic;margin-top:2px}
 .small{font-size:12px;color:#656d76;margin-top:6px}.warn{color:#9a6700}
+.alt{font-size:13px;color:#656d76;margin-top:4px}.cn2{font-family:"PingFang SC","Noto Sans SC",sans-serif}
 </style></head><body>
 <h1>${escapeHtml(heading(rows, names, lang))}</h1>
 <div class="sub">${t.count(rows.length)} · ${t.exported} ${escapeHtml(new Date().toLocaleString(lang === "zh" ? "zh-CN" : undefined))}</div>
