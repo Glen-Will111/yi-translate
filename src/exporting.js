@@ -1,3 +1,5 @@
+import { wordsDiffer } from "./text.js";
+
 // Turning the conversation record into files to keep, share and study from.
 // Every export is bilingual. lang = "en" gives Glen's copy (English headings and
 // notes), lang = "zh" gives Lucy's copy (Chinese headings and notes).
@@ -54,8 +56,9 @@ const csvCell = s => `"${String(s ?? "").replace(/"/g, '""')}"`;
  * own words, with the standard Mandarin as the extra line.
  */
 function sides(e, lang) {
-  if (e.speaker === "en") return { english: e.source, chinese: e.translated, originalIs: "en", alt: null, std: false };
-  const differs = e.mandarin && e.mandarin !== e.source;
+  // e.lang is set on chat messages, where someone may write in the other's language to practise.
+  if ((e.lang || e.speaker) === "en") return { english: e.source, chinese: e.translated, originalIs: "en", alt: null, std: false };
+  const differs = wordsDiffer(e.mandarin, e.source);
   if (lang === "zh") return { english: e.translated, chinese: e.source, originalIs: "zh", alt: differs ? e.mandarin : null, std: false };
   return { english: e.translated, chinese: e.mandarin || e.source, originalIs: "zh", alt: differs ? e.source : null, std: !!differs };
 }

@@ -78,7 +78,17 @@ const HEARING = {
   apple: (en, zh) => `You receive the iPhone speech recogniser's transcript, not audio. ${en}'s speech goes through an English recogniser. ${zh}'s speech goes through a standard-Mandarin recogniser that has no Chongqing dialect model, so dialect words and accent often come out as wrong characters that sound similar.`,
 };
 
-export function translateSystemPrompt({ names, context, script, hearing = "apple" }) {
+const CHAT_GUIDE = (en, zh) => `MESSAGES IN A CHAT
+${en} and ${zh} are apart (at work, for example) and are sending each other short messages, like texting. Keep the translation as short and natural as a text message. Emoji, "haha", "lol", 哈哈, 嘿嘿 and similar stay as they are or become their natural equivalent. Leave "ask" as null: nobody is there to be asked aloud.
+
+PRACTISING EACH OTHER'S LANGUAGE
+Both are learning the other's language, and sometimes one of them writes in it to practise. The SPEAKER line says when this happens. Then:
+- "heard_as" is exactly what they wrote. Do not correct it there.
+- "translation" is what they meant, in their own first language, so they can see whether they said what they intended.
+- If ${en} wrote in Chinese, "mandarin" is the correct, natural standard Mandarin for what he meant (identical to heard_as if it was already right).
+- If there was a mistake worth learning from, explain it kindly in one short note (in "notes" in English and "notes_zh" in Chinese). If it was right, a short encouraging note is welcome.`;
+
+export function translateSystemPrompt({ names, context, script, hearing = "apple", mode = "together" }) {
   const en = names.en || "Glen";
   const zh = names.zh || "Lucy";
   const scriptRule = script === "traditional"
@@ -88,7 +98,11 @@ export function translateSystemPrompt({ names, context, script, hearing = "apple
     ? `What they have told you about themselves and this conversation: ${context.trim()}`
     : `${DEFAULT_CONTEXT}`;
 
-  return `You are the live interpreter in a face-to-face conversation between two people sharing one iPhone.
+  const intro = mode === "chat"
+    ? "You are the interpreter in a private message chat between two people, each on their own phone."
+    : "You are the live interpreter in a face-to-face conversation between two people sharing one iPhone.";
+
+  return `${intro}
 
 THE PEOPLE
 - ${en} speaks English (Australian English). Translate ${en}'s words into natural spoken Mandarin for ${zh}.
@@ -99,7 +113,7 @@ HOW THE WORDS REACH YOU
 ${(HEARING[hearing] || HEARING.apple)(en, zh)} Before translating, work out what the person actually said and meant. Use the recent conversation for context: omitted subjects, who 他/她 refers to, what "it" is.
 
 ${COUPLE_GUIDE(en, zh)}
-
+${mode === "chat" ? `\n${CHAT_GUIDE(en, zh)}\n` : ""}
 ${CHONGQING_GUIDE}
 
 ${aussieGuide(en)}

@@ -182,6 +182,63 @@ this opens the Share sheet: Messages, WeChat, Mail, Files, AirDrop.
 
 ---
 
+## CHAT — when you're apart (💬 Chat tab)
+
+The app has two tabs. **👥 Together** is the in-person interpreter above.
+**💬 Chat** is for when you're each on your own phone, e.g. at work. You each
+write or speak in your own language; the other gets it translated and checked.
+
+### One-time setup (do this while you're together, about 5 minutes)
+
+**On Lucy's phone first:**
+1. Open the app's address in Safari (iPhone) or Chrome (Android).
+2. iPhone: **Share → Add to Home Screen**, then open the app **from the Home Screen**.
+   (iPhones only allow alerts for apps on the Home Screen. Needs iOS 16.4 or later.)
+3. If you set an `APP_PASSCODE` in Netlify: ⚙ Settings → **Passcode** → enter it.
+
+**On Glen's phone:**
+4. Open the app → **💬 Chat** → check **Glen** is selected → **Start a new chat**.
+5. A **chat code** appears, like `ABCDE-FGHJK`. Keep it private: anyone with the
+   code could read the chat.
+
+**On Lucy's phone:**
+6. **💬 Chat** → select **Lucy** → type the code → **Join 加入**.
+
+**On both phones:**
+7. Tap **Turn on alerts / 开启提醒**, then **Allow**. Send each other a test
+   message with one phone locked, to check the alert arrives.
+
+### Using it
+- **Type** in the box and tap **↑**. Or tap **🎤**, speak, then pause (or tap ⏹).
+  The 🎤 button needs the OpenAI key; without it, use the keyboard's own
+  dictation button.
+- Each message is translated and **checked before it is sent**. You'll see
+  *translating… → checking… → ✓ checked*. It takes a few seconds.
+- **What you see:** your own language on top, the other language underneath.
+  Glen sees standard Mandarin with pinyin (and Lucy's own dialect words when
+  they differ). Lucy sees Chinese first, English underneath.
+- **🔊 / 🐢 Slow** read out the language you're learning.
+- **▶ Voice** plays the other person's actual voice message.
+- **Practising:** write in the other language if you like. Glen can type
+  Chinese, Lucy can type English. The app shows what it means, marks it
+  *✍️ practising*, and adds a gentle note if something was off.
+- **Not sent?** A failed message is marked in red with **↻ Retry**.
+- **New messages** show a red count on the Chat tab, and an alert on the phone.
+- **↑ Save** while on the Chat tab saves the chat, as Glen's copy or Lucy's copy.
+- **⋯** shows the chat code, lets you send it, change who the phone belongs
+  to, or leave the chat.
+
+### Good to know
+- Messages are stored in your own Netlify project (Netlify Blobs, built in,
+  nothing to set up). Only the two phones with the chat code can read them.
+- The last 300 messages are kept on each phone; a phone that joins later gets
+  the latest 200.
+- Alerts depend on the phone: Low Power Mode or Focus can delay them. If an
+  alert doesn't come, opening the app always shows new messages.
+- Live voice or video calls with translation are not part of this.
+
+---
+
 ## FUTURE UPDATES
 
 When I make improvements to the app:

@@ -25,6 +25,9 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Message alerts: shows the notification and opens the Chat tab when tapped.
+        importScripts: ['push-sw.js'],
+        navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
