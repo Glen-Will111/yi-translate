@@ -60,11 +60,14 @@ function historyBlock(history, names) {
  * Step 1: understand and translate what was said.
  * side = who spoke: "en" (English speaker) or "zh" (Chongqing / Mandarin speaker).
  */
-export async function translateUtterance({ text, side, settings, history = [] }) {
+export async function translateUtterance({ text, side, writer = side, settings, history = [] }) {
   const { names } = settings;
-  const speakerDesc = side === "en"
-    ? `${names.en} (English)`
-    : `${names.zh} (Chongqing dialect and/or Mandarin)`;
+  // writer differs from side when someone writes in the other's language to practise.
+  const speakerDesc = writer !== side
+    ? `${names[writer]}, writing in ${side === "en" ? "English" : "Chinese"} to practise. It is not ${names[writer]}'s first language, so there may be mistakes`
+    : side === "en"
+      ? `${names.en} (English)`
+      : `${names.zh} (Chongqing dialect and/or Mandarin)`;
   const user = `${historyBlock(history, names)}SPEAKER: ${speakerDesc}
 TRANSLATE INTO: ${side === "en" ? "Mandarin Chinese" : "English"}
 TRANSCRIPT: ${text}`;
@@ -141,6 +144,37 @@ export async function verifyTranslation({ source, translation, side, settings })
     current = corrected;
   }
   return { translation: current, status: "fail", issue, back, rounds: MAX_CHECK_ROUNDS };
+}
+
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(null), ms))]);
+
+/**
+ * The whole job for one chat message: understand, translate, check, and add
+ * pinyin, before anything is sent. side = the language it was written in,
+ * writer = who wrote it. Returns { garbled: true } for a voice message that
+ * made no sense; otherwise everything the message needs.
+ */
+export async function interpretLine({ text, side, writer = side, settings, history = [], hearing = "typed", onStage }) {
+  const s = { ...settings, hearing, mode: "chat" };
+  onStage?.("translating");
+  const r = await translateUtterance({ text, side, writer, settings: s, history });
+  if (r.garbled && hearing !== "typed") return { garbled: true };
+
+  onStage?.("checking");
+  const mandarin = side === "zh" ? (r.mandarin || r.heardAs) : null;
+  // Pinyin is always for the standard Mandarin. Start it now to save time.
+  const early = fetchPinyin(side === "zh" ? mandarin : r.translation, s).catch(() => null);
+  const v = await verifyTranslation({ source: r.heardAs, translation: r.translation, side, settings: s });
+  let pinyin = await withTimeout(early, 8000);
+  if (side === "en" && v.translation !== r.translation) {
+    pinyin = await withTimeout(fetchPinyin(v.translation, s).catch(() => null), 8000);
+  }
+  return {
+    garbled: false,
+    source: r.heardAs, mandarin, translated: v.translation, pinyin: pinyin || null,
+    tone: r.tone, notes: r.notes, notesZh: r.notesZh, check: r.check, checkZh: r.checkZh,
+    verify: v.status, issue: v.issue, back: v.back,
+  };
 }
 
 export async function fetchPinyin(chinese, settings) {

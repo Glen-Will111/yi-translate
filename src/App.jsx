@@ -7,9 +7,20 @@ import { DEFAULT_CONTEXT } from "./prompts.js";
 import { Listener, recognitionSupported, speak, stopSpeaking, unlockSpeech } from "./speech.js";
 import { CloudListener, cloudCaptureSupported } from "./cloudListener.js";
 import { toText, toCsv, toHtml, deliverFile, exportFilename } from "./exporting.js";
+import Chat from "./Chat.jsx";
+import { wordsDiffer } from "./text.js";
 
 const SETTINGS_KEY = "yi.settings.v2";
 const CONVO_KEY = "yi.conversation.v2";
+const TAB_KEY = "yi.tab.v1";
+
+// A link such as /?tab=chat&join=CODE (from an alert or an invitation) opens the Chat tab.
+function startParams() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    return { tab: q.get("tab") === "chat" || q.get("join") ? "chat" : null, join: q.get("join") || "" };
+  } catch { return { tab: null, join: "" }; }
+}
 
 const DEFAULT_SETTINGS = {
   names: { en: "Glen", zh: "Lucy" },
@@ -75,6 +86,10 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [panel, setPanel] = useState(null);        // settings | export | type
   const [exportLang, setExportLang] = useState("en");
+  const [start] = useState(startParams);
+  const [tab, setTab] = useState(() => start.tab || (load(TAB_KEY, "together") === "chat" ? "chat" : "together"));
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatEntriesRef = useRef([]);
   const [typed, setTyped] = useState({ en: "", zh: "" });
   const [exportMsg, setExportMsg] = useState("");
 
@@ -109,6 +124,16 @@ export default function App() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [entries.length, liveText]);
   useEffect(() => { cloudRef.current.configure({ sensitivity: settings.sensitivity, pause: settings.pause }); }, [settings.sensitivity, settings.pause]);
   useEffect(() => { cloudHearingAvailable().then(setCloudReady); }, []);
+  useEffect(() => { save(TAB_KEY, tab); }, [tab]);
+
+  // Tapping a message alert brings the app forward on the Chat tab.
+  useEffect(() => {
+    const sw = navigator.serviceWorker;
+    if (!sw) return undefined;
+    const onMessage = e => { if (e.data?.type === "open-chat") fns.current.switchTab("chat"); };
+    sw.addEventListener("message", onMessage);
+    return () => sw.removeEventListener("message", onMessage);
+  }, []);
 
   useEffect(() => {
     const synth = window.speechSynthesis;
@@ -463,7 +488,7 @@ export default function App() {
     };
   }, [convoOn]);
 
-  fns.current = { listen, cloudHandlers, stopConversation };
+  fns.current = { listen, cloudHandlers, stopConversation, switchTab };
 
   // ── Entry actions ─────────────────────────────────────────────────────
   function retry(entry) {
@@ -513,6 +538,12 @@ export default function App() {
     });
   }
 
+  function switchTab(next) {
+    if (next === "chat") stopConversation(); // the in-person mic never runs behind the Chat tab
+    setPanel(p => (p === "type" ? null : p));
+    setTab(next);
+  }
+
   function clearConversation() {
     if (entries.length && !window.confirm("Clear the whole conversation? Save a copy first if you want to keep it.")) return;
     stopConversation();
@@ -521,18 +552,22 @@ export default function App() {
     setPanel(null);
   }
 
+  // The record being saved: the in-person conversation, or the chat, whichever tab is open.
+  const recordEntries = () => (tab === "chat" ? chatEntriesRef.current : entries);
+
   async function doExport(type) {
-    if (!entries.some(e => e.status === "done")) return;
+    const record = recordEntries();
+    if (!record.some(e => e.status === "done")) return;
     let msg = "";
     if (type === "copy") {
-      try { await navigator.clipboard.writeText(toText(entries, names, exportLang)); msg = exportLang === "zh" ? "已复制 ✓" : "Copied ✓"; }
+      try { await navigator.clipboard.writeText(toText(record, names, exportLang)); msg = exportLang === "zh" ? "已复制 ✓" : "Copied ✓"; }
       catch { msg = "Couldn't copy. Try Text instead."; }
     } else {
-      const content = type === "txt" ? toText(entries, names, exportLang)
-        : type === "csv" ? toCsv(entries, names, exportLang)
-        : toHtml(entries, names, exportLang);
+      const content = type === "txt" ? toText(record, names, exportLang)
+        : type === "csv" ? toCsv(record, names, exportLang)
+        : toHtml(record, names, exportLang);
       const mime = { txt: "text/plain;charset=utf-8", csv: "text/csv;charset=utf-8", html: "text/html;charset=utf-8" }[type];
-      msg = await deliverFile(exportFilename(entries, names, type, exportLang), content, mime);
+      msg = await deliverFile(exportFilename(record, names, type, exportLang), content, mime);
     }
     setExportMsg(msg);
     setTimeout(() => setExportMsg(""), 2500);
@@ -560,7 +595,7 @@ export default function App() {
 
   const hearingLabel = settings.hearing === "apple" ? "iPhone hearing"
     : cloudReady && cloudCaptureSupported ? "OpenAI hearing" : "iPhone hearing";
-  const doneCount = entries.filter(e => e.status === "done").length;
+  const doneCount = recordEntries().filter(e => e.status === "done").length;
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -583,10 +618,29 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          <button onClick={() => setPanel(p => (p === "type" ? null : "type"))} style={iconBtn(panel === "type")} aria-label="Type">⌨</button>
+          {tab === "together" && (
+            <button onClick={() => setPanel(p => (p === "type" ? null : "type"))} style={iconBtn(panel === "type")} aria-label="Type">⌨</button>
+          )}
           <button onClick={() => setPanel(p => (p === "export" ? null : "export"))} style={iconBtn(panel === "export")}>↑ Save</button>
           <button onClick={() => setPanel(p => (p === "settings" ? null : "settings"))} style={iconBtn(panel === "settings")} aria-label="Settings">⚙</button>
         </div>
+      </div>
+
+      {/* Together (one phone between you) or Chat (apart, a phone each) */}
+      <div role="tablist" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", background: "#161b22", borderBottom: "1px solid #30363d", flexShrink: 0 }}>
+        {[["together", "👥 Together", "在一起"], ["chat", "💬 Chat", "不在一起"]].map(([id, label, zhLabel]) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => switchTab(id)} style={{
+            padding: "8px 6px", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
+            color: tab === id ? "#e6edf3" : "#8b949e", borderBottom: `2px solid ${tab === id ? "#58a6ff" : "transparent"}`,
+          }}>
+            {label} <span style={{ fontWeight: 500, fontSize: 11, fontFamily: CN_FONT }}>{zhLabel}</span>
+            {id === "chat" && chatUnread > 0 && (
+              <span aria-label={`${chatUnread} new`} style={{
+                marginLeft: 6, background: "#f85149", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11,
+              }}>{chatUnread}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Settings */}
@@ -671,7 +725,7 @@ export default function App() {
       {panel === "export" && (
         <div style={panelStyle}>
           <div style={{ fontSize: 11, color: "#8b949e", fontWeight: 700, letterSpacing: "0.6px" }}>
-            SAVE THE RECORD · {doneCount} exchanges · English + 中文 side by side
+            SAVE THE {tab === "chat" ? "CHAT" : "RECORD"} · {doneCount} {tab === "chat" ? "messages" : "exchanges"} · English + 中文 side by side
           </div>
           <Row label="Copy for">
             <ToggleGroup options={[{ v: "en", l: `${names.en} (English notes)` }, { v: "zh", l: `${names.zh}（中文注释）` }]}
@@ -687,13 +741,18 @@ export default function App() {
             ))}
           </div>
           <div style={{ fontSize: 12, color: "#8b949e" }}>
-            Shares through the iPhone share sheet (Messages, WeChat, Mail, Files). The conversation is also kept on
-            this phone until you clear it.
+            Shares through the iPhone share sheet (Messages, WeChat, Mail, Files).
+            {tab === "chat" ? " Saves the chat messages on this phone." : " The conversation is also kept on this phone until you clear it."}
           </div>
           {exportMsg && <div style={{ fontSize: 13, color: "#3fb950" }}>{exportMsg}</div>}
         </div>
       )}
 
+      <Chat active={tab === "chat"} settings={settings} cloudReady={!!cloudReady} fs={fs} joinCode={start.join}
+        onUnread={setChatUnread} onEntries={list => { chatEntriesRef.current = list; }} />
+
+      {/* Everything below belongs to Together: hidden, not removed, while Chat is open */}
+      <div style={{ display: tab === "together" ? "contents" : "none" }}>
       {/* Status */}
       <div style={{
         background: "#0d1117", borderBottom: "1px solid #21262d", padding: "6px 16px",
@@ -789,6 +848,7 @@ export default function App() {
             btn,
           ];
         })}
+      </div>
       </div>
 
       <style>{`
@@ -923,7 +983,7 @@ function EntryCard({ entry, names, fs, settings, canAct, canRetryAudio, onReplay
   const badge = VERIFY_BADGE[entry.verify];
   const pinyin = settings.showPinyin && entry.pinyin;
   const shownSource = (side === "zh" && entry.mandarin) || entry.source;
-  const dialectDiffers = side === "zh" && entry.mandarin && entry.mandarin !== entry.source;
+  const dialectDiffers = side === "zh" && wordsDiffer(entry.mandarin, entry.source);
   const done = entry.status === "done";
 
   return (

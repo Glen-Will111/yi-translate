@@ -129,6 +129,8 @@ export class CloudListener {
     this.proc = null;
     try { this.ctx?.close(); } catch { /* ignore */ }
     this.ctx = null;
+    // Hand the speaker back at full volume once the mic is no longer needed.
+    try { if (navigator.audioSession) navigator.audioSession.type = "auto"; } catch { /* Safari 16.4+ only */ }
   }
 
   onFrame(input) {
